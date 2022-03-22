@@ -1,4 +1,4 @@
-SCRIPTPATH="/home/patryk/Studia/PracaMagisterska/optimus"
+SCRIPTPATH="/home/patryk/Studia/PracaMagisterska/optimus/Optimus"
 IMAGE="pszelew/optimus_env:1.0"
 echo $IMAGE
 

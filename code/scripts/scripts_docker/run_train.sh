@@ -1,5 +1,5 @@
 #!/bin/bash
-export PYTHONPATH="${PYTHONPATH}:/workspace/Optimus/code"
+export PYTHONPATH="${PYTHONPATH}:/workspace/code"
 export GPU_ID=0
 
 export TRAIN_FILE=../../../data/datasets/debug_data/train.txt
