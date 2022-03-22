@@ -5,4 +5,7 @@ code/runs
 output/*
 code/pytorch_transformers/__pycache__/*
 code/examples/big_ae/modules/encoders/__pycache__/*
-
+code/pytorch_transformers/__pycache__/*
+code/scripts/scripts_docker/runs/*
+__pycache__/
+_

@@ -7,14 +7,12 @@ from .utils import log_sum_exp
 import pdb
 
 import logging
-
 logger = logging.getLogger(__name__)
 
 
 class VAE(nn.Module):
     """VAE with normal prior"""
-
-    def __init__(self, encoder, decoder, tokenizer_encoder, tokenizer_decoder, args):  #
+    def __init__(self, encoder, decoder,  tokenizer_encoder, tokenizer_decoder, args): # 
         super(VAE, self).__init__()
         self.encoder = encoder
         self.decoder = decoder
@@ -22,12 +20,9 @@ class VAE(nn.Module):
         self.args = args
         self.nz = args.latent_size
 
-        self.eos_token_id = tokenizer_decoder.convert_tokens_to_ids(
-            [tokenizer_decoder.eos_token]
-        )[0]
-        self.pad_token_id = tokenizer_decoder.convert_tokens_to_ids(
-            [tokenizer_decoder.pad_token]
-        )[0]
+        self.eos_token_id = tokenizer_decoder.convert_tokens_to_ids([tokenizer_decoder.eos_token])[0]
+        self.pad_token_id = tokenizer_decoder.convert_tokens_to_ids([tokenizer_decoder.pad_token])[0]
+
 
         # connector: from Bert hidden units to the latent space
         # self.linear = nn.Linear(args.nz, 2 * args.nz, bias=False)
@@ -69,12 +64,14 @@ class VAE(nn.Module):
         # pdb.set_trace()
         # mean, logvar = mean.squeeze(0), logvar.squeeze(0)
 
-        logvar.fill_(0.0)
+        logvar.fill_(.0)
         # (batch, nsamples, nz)
         z = self.reparameterize(mean, logvar, nsamples)
         KL = 0.5 * (mean.pow(2) + logvar.exp() - logvar - 1).sum(dim=1)
 
         return z, KL
+
+
 
     def reparameterize(self, mu, logvar, nsamples=1):
         """sample from posterior Gaussian family
@@ -98,39 +95,30 @@ class VAE(nn.Module):
 
     def forward(self, inputs, labels):
 
-        # pdb.set_trace()
-
-        attention_mask = (inputs > 0).float()
+        # pdb.set_trace()   
+        
+        attention_mask=(inputs > 0).float()
         # logger.info(inputs)
         # logger.info(attention_mask)
         # logger.info(labels)
-        reconstrution_mask = (
-            labels != 50257
-        ).float()  # 50257 is the padding token for GPT2
+        reconstrution_mask=(labels != 50257).float() # 50257 is the padding token for GPT2
         sent_length = torch.sum(reconstrution_mask, dim=1)
 
+        
         outputs = self.encoder(inputs, attention_mask)
-        pooled_hidden_fea = outputs[
-            1
-        ]  # model outputs are always tuple in pytorch-transformers (see doc)
+        pooled_hidden_fea = outputs[1]  # model outputs are always tuple in pytorch-transformers (see doc)
 
-        if self.args.fb_mode == 0:
+        if self.args.fb_mode==0: 
             # Connect hidden feature to the latent space
             latent_z, loss_kl = self.connect(pooled_hidden_fea)
             latent_z = latent_z.squeeze(1)
 
+            
             # Decoding
-            outputs = self.decoder(
-                input_ids=labels,
-                past=latent_z,
-                labels=labels,
-                label_ignore=self.pad_token_id,
-            )
-            loss_rec = outputs[
-                0
-            ]  # model outputs are always tuple in pytorch-transformers (see doc)
-
-        elif self.args.fb_mode == 1:
+            outputs = self.decoder(input_ids=labels, past=latent_z, labels=labels, label_ignore=self.pad_token_id)
+            loss_rec = outputs[0]  # model outputs are always tuple in pytorch-transformers (see doc)
+    
+        elif self.args.fb_mode==1:  
             # Connect hidden feature to the latent space
             mu, logvar = self.encoder.linear(pooled_hidden_fea).chunk(2, -1)
             latent_z = self.reparameterize(mu, logvar, nsamples=1)
@@ -142,40 +130,30 @@ class VAE(nn.Module):
             # pdb.set_trace()
             # past = self.decoder.linear(latent_z)
             # Decoding
-            outputs = self.decoder(
-                input_ids=labels,
-                past=latent_z,
-                labels=labels,
-                label_ignore=self.pad_token_id,
-            )
-            loss_rec = outputs[
-                0
-            ]  # model outputs are always tuple in pytorch-transformers (see doc)
+            outputs = self.decoder(input_ids=labels, past=latent_z, labels=labels, label_ignore=self.pad_token_id)
+            loss_rec = outputs[0]  # model outputs are always tuple in pytorch-transformers (see doc)
 
-        elif self.args.fb_mode == 2:
+        elif self.args.fb_mode==2: 
             # Connect hidden feature to the latent space
             latent_z, loss_kl = self.connect_deterministic(pooled_hidden_fea)
             latent_z = latent_z.squeeze(1)
 
             # past = self.decoder.linear(latent_z)
             # Decoding
-            outputs = self.decoder(
-                input_ids=labels,
-                past=latent_z,
-                labels=labels,
-                label_ignore=self.pad_token_id,
-            )
-            loss_rec = outputs[
-                0
-            ]  # model outputs are always tuple in pytorch-transformers (see doc)
+            outputs = self.decoder(input_ids=labels, past=latent_z, labels=labels, label_ignore=self.pad_token_id)
+            loss_rec = outputs[0]  # model outputs are always tuple in pytorch-transformers (see doc)
 
+            
         # pdb.set_trace()
         if self.args.length_weighted_loss:
             loss = loss_rec / sent_length + self.args.beta * loss_kl
         else:
-            loss = loss_rec + self.args.beta * loss_kl
+            loss = loss_rec + self.args.beta * loss_kl 
+
 
         return loss_rec, loss_kl, loss
+
+
 
     def encoder_sample(self, bert_fea, nsamples):
         """sampling from the encoder
@@ -192,6 +170,7 @@ class VAE(nn.Module):
         z = self.reparameterize(mu, logvar, nsamples)
 
         return z, (mu, logvar)
+
 
     def encode_stats(self, x):
         """
@@ -221,6 +200,7 @@ class VAE(nn.Module):
         else:
             raise ValueError("the decoding strategy is not supported")
 
+
     def reconstruct(self, x, decoding_strategy="greedy", K=5):
         """reconstruct from input x
         Args:
@@ -243,11 +223,11 @@ class VAE(nn.Module):
             log_p: (batch_size, n_sample).
                 log_p(x|z) across different x and z
         """
-        outputs = self.decoder(
-            input_ids=x, past=z, labels=x, label_ignore=self.pad_token_id
-        )
+        outputs = self.decoder(input_ids=x, past=z, labels=x, label_ignore=self.pad_token_id)
         loss_rec = outputs[0]
         return -loss_rec
+
+
 
     def loss_iw(self, x0, x1, nsamples=50, ns=1):
         """
@@ -267,6 +247,7 @@ class VAE(nn.Module):
         # (batch_size, nz)
 
         mu, logvar = self.encoder.linear(bert_fea).chunk(2, -1)
+        
 
         ##################
         # compute KL
@@ -282,30 +263,32 @@ class VAE(nn.Module):
             z = self.reparameterize(mu, logvar, ns)
             # past = self.decoder.linear(z)
             past = z
-
+         
             # [batch, nsamples]
             log_prior = self.eval_prior_dist(z)
             log_gen = self.eval_cond_ll(x1, past)
             log_infer = self.eval_inference_dist(z, (mu, logvar))
 
             # pdb.set_trace()
-            log_gen = log_gen.unsqueeze(0).contiguous().view(z.shape[0], -1)
+            log_gen = log_gen.unsqueeze(0).contiguous().view(z.shape[0],-1)
+
 
             # pdb.set_trace()
             rc_tmp.append(log_gen)
             ll_tmp.append(log_gen + log_prior - log_infer)
 
-        log_prob_iw = log_sum_exp(torch.cat(ll_tmp, dim=-1), dim=-1) - math.log(
-            nsamples
-        )
+            
+        
+        log_prob_iw = log_sum_exp(torch.cat(ll_tmp, dim=-1), dim=-1) - math.log(nsamples)
         log_gen_iw = torch.mean(torch.cat(rc_tmp, dim=-1), dim=-1)
 
-        return log_prob_iw, log_gen_iw, KL
+        return log_prob_iw, log_gen_iw , KL
+
 
     def nll_iw(self, x0, x1, nsamples, ns=1):
         """compute the importance weighting estimate of the log-likelihood
         Args:
-            x0, x1:  two different tokenization results of x, where x is the data tensor with shape (batch, *).
+            x0, x1:  two different tokenization results of x, where x is the data tensor with shape (batch, *). 
             nsamples: Int
                 the number of samples required to estimate marginal data likelihood
         Returns: Tensor1
@@ -317,7 +300,7 @@ class VAE(nn.Module):
         # nsamples = 500, ns = 10
 
         # TODO: note that x is forwarded twice in self.encoder.sample(x, ns) and self.eval_inference_dist(x, z, param)
-        # .      this problem is to be solved in order to speed up
+        #.      this problem is to be solved in order to speed up
 
         tmp = []
         for _ in range(int(nsamples / ns)):
@@ -373,20 +356,20 @@ class VAE(nn.Module):
 
         return log_prior + log_gen
 
+
+
     def eval_cond_ll(self, x, z):
-        """compute log p(x|z)"""
+        """compute log p(x|z)
+        """
         x_shape = list(x.size())
         z_shape = list(z.size())
         if len(z_shape) == 3:
-            x = (
-                x.unsqueeze(1)
-                .repeat(1, z_shape[1], 1)
-                .contiguous()
-                .view(x_shape[0] * z_shape[1], x_shape[-1])
-            )
-            z = z.contiguous().view(x_shape[0] * z_shape[1], z_shape[-1])
+            x = x.unsqueeze(1).repeat(1, z_shape[1], 1).contiguous().view(x_shape[0]*z_shape[1], x_shape[-1]) 
+            z = z.contiguous().view(x_shape[0]*z_shape[1], z_shape[-1]) 
 
         return self.log_probability(x, z)
+
+
 
     def eval_log_model_posterior(self, x, grid_z):
         """perform grid search to calculate the true posterior
@@ -425,6 +408,7 @@ class VAE(nn.Module):
 
         return z
 
+
     def sample_from_posterior(self, x, nsamples):
         """perform MH sampling from model posterior
         Returns: Tensor
@@ -439,9 +423,8 @@ class VAE(nn.Module):
         total_iter = self.args.mh_burn_in + nsamples * self.args.mh_thin
         samples = []
         for iter_ in range(total_iter):
-            next = torch.normal(
-                mean=cur, std=cur.new_full(size=cur.size(), fill_value=self.args.mh_std)
-            )
+            next = torch.normal(mean=cur,
+                std=cur.new_full(size=cur.size(), fill_value=self.args.mh_std))
             # [batch_size, 1]
             next_ll = self.eval_complete_ll(x, next)
             ratio = next_ll - cur_ll
@@ -457,13 +440,11 @@ class VAE(nn.Module):
             cur = mask_ * next + (1 - mask_) * cur
             cur_ll = mask * next_ll + (1 - mask) * cur_ll
 
-            if (
-                iter_ >= self.args.mh_burn_in
-                and (iter_ - self.args.mh_burn_in) % self.args.mh_thin == 0
-            ):
+            if iter_ >= self.args.mh_burn_in and (iter_ - self.args.mh_burn_in) % self.args.mh_thin == 0:
                 samples.append(cur.unsqueeze(1))
 
         return torch.cat(samples, dim=1)
+
 
     def calc_model_posterior_mean(self, x, grid_z):
         """compute the mean value of model posterior, i.e. E_{z ~ p(z|x)}[z]
@@ -492,6 +473,9 @@ class VAE(nn.Module):
 
         return mean
 
+
+ 
+
     def eval_inference_dist(self, z, param):
         """this function computes log q(z | x)
         Args:
@@ -513,22 +497,23 @@ class VAE(nn.Module):
         dev = z - mu
 
         # (batch_size, nsamples)
-        log_density = -0.5 * ((dev**2) / var).sum(dim=-1) - 0.5 * (
-            nz * math.log(2 * math.pi) + logvar.sum(-1)
-        )
+        log_density = -0.5 * ((dev ** 2) / var).sum(dim=-1) - \
+            0.5 * (nz * math.log(2 * math.pi) + logvar.sum(-1))
 
         return log_density
 
+
+
     def calc_mi(self, test_data_batch, args):
         # calc_mi_v3
-        import math
+        import math 
         from modules.utils import log_sum_exp
 
         mi = 0
         num_examples = 0
 
         mu_batch_list, logvar_batch_list = [], []
-        neg_entropy = 0.0
+        neg_entropy = 0.
         for batch_data in test_data_batch:
 
             x0, _, _ = batch_data
@@ -542,17 +527,13 @@ class VAE(nn.Module):
 
             x_batch, nz = mu.size()
 
-            # print(x_batch, end=' ')
+            #print(x_batch, end=' ')
 
             num_examples += x_batch
 
             # E_{q(z|x)}log(q(z|x)) = -0.5*nz*log(2*\pi) - 0.5*(1+logvar).sum(-1)
 
-            neg_entropy += (
-                (-0.5 * nz * math.log(2 * math.pi) - 0.5 * (1 + logvar).sum(-1))
-                .sum()
-                .item()
-            )
+            neg_entropy += (-0.5 * nz * math.log(2 * math.pi)- 0.5 * (1 + logvar).sum(-1)).sum().item()
             mu_batch_list += [mu.cpu()]
             logvar_batch_list += [logvar.cpu()]
 
@@ -562,13 +543,13 @@ class VAE(nn.Module):
         ##print()
 
         num_examples = 0
-        log_qz = 0.0
+        log_qz = 0.
         for i in range(len(mu_batch_list)):
             ###############
             # get z_samples
             ###############
             mu, logvar = mu_batch_list[i].cuda(), logvar_batch_list[i].cuda()
-
+            
             # [z_batch, 1, nz]
 
             z_samples = self.reparameterize(mu, logvar, 1)
@@ -580,8 +561,8 @@ class VAE(nn.Module):
             # compute density
             ###############
             # [1, x_batch, nz]
-            # mu, logvar = mu_batch_list[i].cuda(), logvar_batch_list[i].cuda()
-            # indices = list(np.random.choice(np.arange(len(mu_batch_list)), 10)) + [i]
+            #mu, logvar = mu_batch_list[i].cuda(), logvar_batch_list[i].cuda()
+            #indices = list(np.random.choice(np.arange(len(mu_batch_list)), 10)) + [i]
             indices = np.arange(len(mu_batch_list))
             mu = torch.cat([mu_batch_list[_] for _ in indices], dim=0).cuda()
             logvar = torch.cat([logvar_batch_list[_] for _ in indices], dim=0).cuda()
@@ -594,9 +575,8 @@ class VAE(nn.Module):
             dev = z_samples - mu
 
             # (z_batch, x_batch)
-            log_density = -0.5 * ((dev**2) / var).sum(dim=-1) - 0.5 * (
-                nz * math.log(2 * math.pi) + logvar.sum(-1)
-            )
+            log_density = -0.5 * ((dev ** 2) / var).sum(dim=-1) - \
+                0.5 * (nz * math.log(2 * math.pi) + logvar.sum(-1))
 
             # log q(z): aggregate posterior
             # [z_batch]
@@ -607,8 +587,11 @@ class VAE(nn.Module):
 
         return mi
 
+
+
     def calc_au(self, eval_dataloader, args, delta=0.01):
-        """compute the number of active units"""
+        """compute the number of active units
+        """
         cnt = 0
         for batch_data in eval_dataloader:
 
@@ -652,3 +635,4 @@ class VAE(nn.Module):
         au_var = var_sum / (cnt - 1)
 
         return (au_var >= delta).sum().item(), au_var
+
