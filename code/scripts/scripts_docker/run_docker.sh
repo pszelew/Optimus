@@ -1,5 +1,5 @@
 SCRIPTPATH="/home/patryk/Studia/PracaMagisterska/optimus"
-IMAGE="chunyl/pytorch-transformers:v2"
+IMAGE="pszelew/optimus_env:1.0"
 echo $IMAGE
 
 docker run \
